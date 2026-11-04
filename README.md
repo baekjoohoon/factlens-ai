@@ -1,13 +1,23 @@
 # FactLens AI — Meta Global AI Developer Hackathon 2026 제출본
 
+> **English summary.** FactLens AI verifies investment claims found online against Korean
+> DART annual-report filings. You paste a sentence **or upload a screenshot**; Meta Muse
+> reads the claim, but every number is recomputed in Python `Decimal` from the filing, and the
+> verdict is a pure function of those computed values. The model is never allowed to produce
+> a number or a verdict, so results are deterministic even though the LLM runs every time.
+> Built during the hackathon: `factlens/vision.py` (Muse vision), `MusePlanner` in
+> `factlens/llm.py` (Meta Model API), the UI/CLI wiring, and 11 new tests. The calc/verdict/
+> filing layers are a pre-existing codebase and are reused unchanged — see §1 for details.
+> Repo: https://github.com/baekjoohoon/factlens-ai
+
 온라인에서 접한 투자 관련 주장을 **금융감독원 OpenDART 공시**와 대조하고,
 수치를 **별도 Python 계산 모듈**로 재계산해 판정과 근거·한계를 함께 제시하는 에이전트입니다.
 
 - 공모전: Meta Global AI Developer Hackathon 2026 (제출 마감 2026-11-05 10:00 KST)
 - 트랙: Indie · 테마: Build for Your World
 - 팀: FactLens AI by Seonu_Papa (개인 참가 · 백주훈)
-- 상태: **v1.0 해커톤 제출본** — Meta Muse Spark 1.3 주장 구조화 + OpenDART 조회 + 결정적 계산 + 판정/보류
-- 최종 확인: 2026-11-04 · 단위 테스트 51건 통과 · 시나리오 8건 통과
+- 상태: **v1.1 해커톤 제출본** — Muse Spark 1.3 주장 구조화 + **Muse 비전 이미지 판독** + OpenDART 조회 + 결정적 계산 + 판정/보류
+- 최종 확인: 2026-11-05 · 단위 테스트 62건 통과 · 시나리오 11건 통과
 
 ---
 
@@ -16,6 +26,7 @@
 | 구분 | 항목 | 상태 |
 |---|---|---|
 | 구현 | 문장 → 검증 가능한 주장 분해 (**Meta Muse Spark 1.3 실호출**, 실패 시 규칙 기반 폴백) | 완료 |
+| 구현 | **이미지(캡처·스크린샷) → 주장 문장 추출 (Muse 비전 입력)** | 완료 |
 | 구현 | LLM 응답 JSON 스키마 강제 + 수치·근거문 2차 가드 | 완료 |
 | 구현 | 기업명 → OpenDART 고유번호 식별(정확/별칭/종목코드/부분일치) | 완료 |
 | 구현 | 사업보고서 연결·별도 재무제표 조회 | 완료 |
@@ -28,9 +39,13 @@
 | 미구현 | 정확도(%) 측정 — 8건은 기능 확인 표본이며 정확도 지표가 아님 | 본선 |
 | 미구현 | SNS 자동 수집, KIC 내부 데이터 연동, 주가/추천 | 범위 외 |
 
-> **검증 상태**: OpenDART 실호출과 실제 LLM 호출은 2026-10-26에 완료했습니다.
-> 결과는 `tests/results/`에 원본 JSON으로 남아 있고, 상세 기록은
-> `C:/AI_Agent/KIC_FactLens/final/AI_Agent_실행테스트결과.md` 에 있습니다.
+> **검증 상태**: OpenDART 실호출과 실제 Muse 호출은 2026-11-04~05에 완료했습니다.
+> 결과는 `tests/results/`에 원본 JSON으로 남아 있습니다.
+
+> **해커톤 중 새로 만든 부분**: `factlens/vision.py`(이미지 판독), `factlens/llm.py`의
+> `MusePlanner`(Meta Model API 연동·스키마 강제·추론토큰 대응), 위 둘을 잇는 UI/CLI 배선,
+> 그리고 `tests/test_vision.py`·시나리오 9~11(이미지 경로)입니다.
+> 기존 코드베이스(계산·판정·공시 조회)는 해커톤 이전에 작성한 것을 그대로 사용했습니다.
 
 ---
 
@@ -96,9 +111,12 @@ python run_cli.py --planner muse "삼성전자 매출이 작년보다 40% 늘었
 python run_cli.py --planner rule "삼성전자 매출이 지난해보다 16% 증가했다."
 python run_cli.py --json --planner muse "삼성전자 매출이 연결 기준으로 지난해보다 10.9% 증가했다."
 
+# 이미지에서 문장을 읽어 검증 (Muse 비전)
+python run_cli.py --image capture.png
+
 # (4) 테스트
-python -m pytest -q                  # 단위 51건 (네트워크 불필요)
-python scripts/scenarios.py          # 시나리오 8건 (실제 LLM + OpenDART 호출)
+python -m pytest -q                  # 단위 62건 (네트워크 불필요)
+python scripts/scenarios.py          # 시나리오 11건 (실제 Muse + OpenDART 호출)
 ```
 
 `--planner` 값: `auto`(기본, Muse→실패 시 규칙) · `muse`(Muse만) · `rule`(규칙만) · `codex`(레거시)
@@ -110,6 +128,7 @@ python scripts/scenarios.py          # 시나리오 8건 (실제 LLM + OpenDART 
 ```
 사용자 문장
    │
+   ├─ 0. 이미지 판독      vision.py       (이미지 입력 시) Muse 비전 → 문장만 추출
    ├─ 1. 주장 분해        llm.py          Muse 호출 → JSON 스키마 강제 → 수치·근거문 가드
    │                                      (실패 시 claims.py 규칙 기반 폴백)
    ├─ 2. 기업 식별        corp.py         기업명 → corp_code (모호하면 보류)
@@ -155,7 +174,7 @@ FactLens_AI/
 ├─ run_cli.py                명령행 실행 (--planner auto|llm|rule)
 ├─ scripts/
 │  ├─ test_connection.py     API 연결 테스트
-│  ├─ scenarios.py           시나리오 8건 실행 → tests/results/*.json
+│  ├─ scenarios.py           시나리오 11건 실행 → tests/results/*.json
 │  ├─ llm_smoke.py           LLM 단일 호출 확인
 │  └─ check_original.py      공시 원문 대조
 ├─ factlens/
@@ -163,6 +182,7 @@ FactLens_AI/
 │  ├─ opendart.py            API 클라이언트(재시도·오류코드·캐시)
 │  ├─ corp.py                기업명 → 고유번호
 │  ├─ llm.py                 MusePlanner·JSON 스키마·2차 가드·폴백
+│  ├─ vision.py              이미지 → 주장 문장 추출 (Muse 비전)
 │  ├─ claims.py              주장 분해(규칙)
 │  ├─ metrics.py             계정 선택 규칙(IFRS 태그 우선)
 │  ├─ calc.py                결정적 계산
@@ -170,9 +190,9 @@ FactLens_AI/
 │  ├─ agent.py               오케스트레이터
 │  └─ store.py               SQLite 실행 기록
 ├─ data/corp_alias.json      별칭 사전(휴리스틱)
-└─ tests/                    단위 테스트 51건
+└─ tests/                    단위 테스트 62건
    ├─ test_calc.py 6 · test_claims.py 7 · test_verdict.py 8 · test_corp.py 6
-   ├─ test_agent_offline.py 8 · test_llm.py 11 · test_faults.py 5
+   ├─ test_agent_offline.py 8 · test_llm.py 11 · test_faults.py 5 · test_vision.py 11
    └─ results/               실호출 원본 기록(JSON)
 ```
 
@@ -211,7 +231,7 @@ FactLens_AI/
 
 ```
 python -m pytest -q
-51 passed
+62 passed
 ```
 
 | 파일 | 건수 | 검증 대상 |
@@ -223,9 +243,11 @@ python -m pytest -q
 | `test_agent_offline.py` | 8 | 오프라인 8단계 파이프라인, 보류 규칙, 단계 기록 |
 | `test_llm.py` | 11 | 스키마 위반 6종 거부, 수치·근거문 가드, 폴백 |
 | `test_faults.py` | 5 | API 5xx·429, LLM 깨진 JSON·스키마 위반·수치 창작 |
+| `test_vision.py` | 11 | 빈/과대 이미지 거부, MIME 추정, NONE 처리, 추론토큰 소진 안내, 키 마스킹 |
 
 - 파이프라인 테스트의 수치는 **합성값(SYNTHETIC)** 이며 실제 공시가 아닙니다.
-- 시나리오 8건은 실제 LLM·OpenDART를 호출합니다: `python scripts/scenarios.py`
+- 시나리오 11건은 실제 Muse·OpenDART를 호출합니다: `python scripts/scenarios.py`
+  (1~8: 문장 입력 / 9~11: 이미지 입력 경로)
 
 ## 11. 보안
 

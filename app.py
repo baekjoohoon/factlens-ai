@@ -86,6 +86,7 @@ def render_report(report: dict) -> None:
         planner_label += f" {planner['latency_ms'] / 1000:.1f}s"
     if planner.get("fallback"):
         planner_label += " (폴백)"
+    vision_label = st.session_state.get("vision_meta")
     meta = " · ".join(
         filter(
             None,
@@ -94,6 +95,7 @@ def render_report(report: dict) -> None:
                 f"고유번호 {company.get('corp_code', '')}" if company.get("corp_code") else "",
                 period.get("label", ""),
                 f"분석 {planner_label}",
+                vision_label or "",
                 f"API 호출 {report.get('api_calls', 0)}회",
             ],
         )
@@ -189,34 +191,86 @@ with st.sidebar:
     st.caption("주가 예측, 매매 추천, 계좌 연동은 제공하지 않습니다.")
 
 default_text = st.session_state.get("input_text", SAMPLES[0])
-text = st.text_area("검증할 문장", value=default_text, height=90, key="input_text")
 
-col_a, col_b, _ = st.columns([1, 1, 3])
-run = col_a.button("검증 실행", type="primary", use_container_width=True)
-if col_b.button("예시 2", use_container_width=True):
-    st.session_state["input_text"] = SAMPLES[1]
-    st.rerun()
+input_tab, image_tab = st.tabs(["문장으로 검증", "이미지로 검증"])
 
-if run:
-    if not key_ok:
-        st.error("DART_API_KEY 가 설정되지 않았습니다. .env 파일을 확인하세요.")
-    elif not text.strip():
-        st.warning("검증할 문장을 입력하세요.")
-    else:
-        with st.spinner("공시 조회 및 재계산 중..."):
-            try:
-                st.session_state["report"] = get_agent(planner_mode).run(text)
-            except OpenDartError as exc:
-                st.error(f"OpenDART 오류 [{exc.code}] {exc.message}")
-                if exc.code in {"020", "HTTP_429"}:
-                    st.caption("호출 한도 초과입니다. 잠시 후 다시 시도하세요.")
-                elif exc.code in {"010", "011", "012"}:
-                    st.caption("인증키 또는 접근 IP 설정을 확인하세요.")
-            except RuntimeError as exc:
-                st.error(str(exc))
-            except Exception as exc:  # noqa: BLE001
-                st.error(f"예상하지 못한 오류: {type(exc).__name__}")
-                st.caption("로그에 인증키가 포함되지 않도록 예외 문자열을 그대로 출력하지 않습니다.")
+with image_tab:
+    st.caption(
+        "캡처·메신저 스크린샷을 그대로 올리면 Muse가 이미지 속 주장 문장을 읽어 검증합니다. "
+        "이미지에서 읽은 것은 **문장뿐**이고, 수치는 여전히 공시와 Python이 만듭니다."
+    )
+    up = st.file_uploader(
+        "이미지 업로드", type=["png", "jpg", "jpeg", "webp"], label_visibility="collapsed"
+    )
+    if up is not None:
+        st.image(up, caption=f"{up.name} · {up.size // 1024}KB", width=420)
+    img_run = st.button("이미지에서 문장 읽고 검증", type="primary", use_container_width=False)
+    if img_run:
+        if not up:
+            st.warning("이미지를 선택하세요.")
+        elif not key_ok:
+            st.error("DART_API_KEY 가 설정되지 않았습니다. .env 파일을 확인하세요.")
+        else:
+            with st.spinner("이미지에서 문장을 읽는 중..."):
+                try:
+                    from factlens.vision import VisionError, extract_claim_text
+
+                    extracted = extract_claim_text(up.getvalue(), filename=up.name)
+                except VisionError as exc:
+                    extracted = None
+                    st.error(str(exc))
+                except Exception as exc:  # noqa: BLE001
+                    extracted = None
+                    st.error(f"이미지 처리 중 오류: {type(exc).__name__}")
+            if extracted is not None:
+                for note in extracted.notes:
+                    st.caption(f"· {note}")
+                if extracted.ok:
+                    st.session_state["input_text"] = extracted.text
+                    st.session_state["vision_meta"] = (
+                        f"이미지 판독 {extracted.model} · {extracted.latency_ms / 1000:.1f}s"
+                    )
+                    with st.spinner("공시 조회 및 재계산 중..."):
+                        try:
+                            st.session_state["report"] = get_agent(planner_mode).run(extracted.text)
+                        except OpenDartError as exc:
+                            st.error(f"OpenDART 오류 [{exc.code}] {exc.message}")
+                        except RuntimeError as exc:
+                            st.error(str(exc))
+                        except Exception as exc:  # noqa: BLE001
+                            st.error(f"예상하지 못한 오류: {type(exc).__name__}")
+                else:
+                    st.warning("이미지에서 검증할 주장을 찾지 못했습니다.")
+
+with input_tab:
+    text = st.text_area("검증할 문장", value=default_text, height=90, key="input_text")
+
+    col_a, col_b, _ = st.columns([1, 1, 3])
+    run = col_a.button("검증 실행", type="primary", use_container_width=True)
+    if col_b.button("예시 2", use_container_width=True):
+        st.session_state["input_text"] = SAMPLES[1]
+        st.rerun()
+
+    if run:
+        if not key_ok:
+            st.error("DART_API_KEY 가 설정되지 않았습니다. .env 파일을 확인하세요.")
+        elif not text.strip():
+            st.warning("검증할 문장을 입력하세요.")
+        else:
+            with st.spinner("공시 조회 및 재계산 중..."):
+                try:
+                    st.session_state["report"] = get_agent(planner_mode).run(text)
+                except OpenDartError as exc:
+                    st.error(f"OpenDART 오류 [{exc.code}] {exc.message}")
+                    if exc.code in {"020", "HTTP_429"}:
+                        st.caption("호출 한도 초과입니다. 잠시 후 다시 시도하세요.")
+                    elif exc.code in {"010", "011", "012"}:
+                        st.caption("인증키 또는 접근 IP 설정을 확인하세요.")
+                except RuntimeError as exc:
+                    st.error(str(exc))
+                except Exception as exc:  # noqa: BLE001
+                    st.error(f"예상하지 못한 오류: {type(exc).__name__}")
+                    st.caption("로그에 인증키가 포함되지 않도록 예외 문자열을 그대로 출력하지 않습니다.")
 
 report = st.session_state.get("report")
 if report:

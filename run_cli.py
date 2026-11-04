@@ -24,12 +24,33 @@ def main() -> int:
     parser.add_argument("--no-cross-check", action="store_true", help="전기 재작성 점검 생략")
     parser.add_argument("--planner", choices=["auto", "muse", "llm", "rule", "codex"], default="auto",
                         help="주장 구조화 방식 (auto=LLM 우선, 실패 시 규칙)")
+    parser.add_argument("--image", help="이미지 파일에서 주장 문장을 읽어 검증 (Muse 비전)")
     args = parser.parse_args()
 
     text = " ".join(args.text) if args.text else DEFAULT_TEXT
     if not config.has_api_key():
         print("DART_API_KEY 미설정: .env 파일에 인증키를 입력하세요.", file=sys.stderr)
         return 2
+
+    if args.image:
+        from factlens.vision import VisionError, extract_claim_text
+
+        try:
+            with open(args.image, "rb") as fh:
+                extracted = extract_claim_text(fh.read(), filename=args.image)
+        except VisionError as exc:
+            print(f"이미지 판독 실패: {exc}", file=sys.stderr)
+            return 4
+        except OSError as exc:
+            print(f"이미지를 열 수 없습니다: {exc}", file=sys.stderr)
+            return 4
+        for note in extracted.notes:
+            print(f"· {note}", file=sys.stderr)
+        if not extracted.ok:
+            print("이미지에서 검증할 주장을 찾지 못했습니다.", file=sys.stderr)
+            return 5
+        print(f"이미지 판독({extracted.model}, {extracted.latency_ms}ms): {extracted.text}", file=sys.stderr)
+        text = extracted.text
 
     agent = VerificationAgent(store=RunStore(), cross_check=not args.no_cross_check,
                               planner=build_planner(args.planner))

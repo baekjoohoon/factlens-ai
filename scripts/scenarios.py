@@ -59,6 +59,64 @@ def run_real(text: str) -> dict:
     return agent.run(text)
 
 
+def _render(text: str) -> bytes:
+    """시나리오용 이미지 생성 (실제 캡처 대신 같은 조건의 텍스트 이미지)."""
+    import io
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    img = Image.new("RGB", (980, 190), "white")
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype("C:/Windows/Fonts/malgun.ttf", 36)
+    draw.text((34, 76), text, font=font, fill="black")
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _vision_cases() -> list:
+    from factlens.vision import VisionError, extract_claim_text
+
+    cases = [
+        ("이미지: 정확한 매출 증가율",
+         "삼성전자 매출이 연결 기준으로 지난해보다 10.9% 증가했다.", "일치"),
+        ("이미지: 잘못된 매출 증가율",
+         "삼성전자 매출이 작년보다 40% 늘었고 부채가 거의 없대.", "불일치"),
+    ]
+    out = []
+    for name, text, expected in cases:
+        try:
+            extracted = extract_claim_text(_render(text))
+            if not extracted.ok:
+                out.append({"case": name, "input": text, "expected": expected,
+                            "actual": "문장 추출 실패", "pass": False,
+                            "detail": "; ".join(extracted.notes)})
+                continue
+            report = run_real(extracted.text)
+            out.append({
+                "case": name, "input": extracted.text, "expected": expected,
+                "actual": report["verdict"], "pass": report["verdict"] == expected,
+                "vision_model": extracted.model, "vision_latency_ms": extracted.latency_ms,
+                "detail": f"이미지 판독 {extracted.latency_ms}ms → 판정 {report['verdict']}",
+            })
+        except VisionError as exc:
+            out.append({"case": name, "input": text, "expected": expected,
+                        "actual": "이미지 판독 실패", "pass": False, "detail": str(exc)[:160]})
+
+    # 이미지에 검증 대상 주장이 없는 경우
+    try:
+        extracted = extract_claim_text(_render("오늘 점심은 김치찌개가 좋겠다"))
+        out.append({
+            "case": "이미지: 주장 없음", "input": "오늘 점심은 김치찌개가 좋겠다",
+            "expected": "빈 결과 + 안내", "actual": "빈 결과" if not extracted.ok else extracted.text,
+            "pass": not extracted.ok, "detail": "; ".join(extracted.notes)[:160],
+        })
+    except VisionError as exc:
+        out.append({"case": "이미지: 주장 없음", "expected": "빈 결과 + 안내",
+                    "actual": "예외", "pass": False, "detail": str(exc)[:160]})
+    return out
+
+
 def main() -> int:
     results = []
     for name, text, expected in CASES:
@@ -121,6 +179,14 @@ def main() -> int:
     print("\n| # | 사례 | 예상 | 실제 | 통과 |")
     print("|---|---|---|---|---|")
     for i, r in enumerate(results, 1):
+        print(f"| {i} | {r['case']} | {r['expected']} | {r['actual']} | {'O' if r['pass'] else 'X'} |")
+
+    # 9~11) 이미지 입력 (Muse 비전) — 해커톤 중 추가한 경로
+    results.extend(_vision_cases())
+    print("\n### 이미지 입력 (Muse 비전)")
+    print("\n| # | 사례 | 예상 | 실제 | 통과 |")
+    print("|---|---|---|---|---|")
+    for i, r in enumerate(results[-3:], len(results) - 2):
         print(f"| {i} | {r['case']} | {r['expected']} | {r['actual']} | {'O' if r['pass'] else 'X'} |")
 
     out_dir = ROOT / "tests" / "results"
