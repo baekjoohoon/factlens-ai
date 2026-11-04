@@ -1,0 +1,26 @@
+[
+  {
+    "name": "app_llm",
+    "url": "http://127.0.0.1:8504",
+    "wait": 10000,
+    "w": 1440,
+    "h": 1320,
+    "dsf": 2,
+    "path": "C:/AI_Agent/FactLens_AI/_shots/app_report_llm.png",
+    "steps": [
+      {
+        "js": "document.querySelectorAll('[data-testid=\"stToolbar\"],[data-testid=\"stDecoration\"],[data-testid=\"stStatusWidget\"]').forEach(e=>e.style.display='none'); 'ok'",
+        "wait": 500
+      },
+      {
+        "js": "(()=>{const b=[...document.querySelectorAll('button')].find(x=>x.textContent.includes('검증 실행')); if(!b) return 'NO_BUTTON'; b.click(); return 'CLICKED';})()",
+        "wait": 40000,
+        "log": true
+      },
+      {
+        "js": "document.querySelectorAll('[data-testid=\"stToolbar\"],[data-testid=\"stDecoration\"],[data-testid=\"stStatusWidget\"]').forEach(e=>e.style.display='none'); 'ok'",
+        "wait": 400
+      }
+    ]
+  }
+]

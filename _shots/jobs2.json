@@ -1,0 +1,27 @@
+[
+  {
+    "name": "opendart_main",
+    "url": "https://opendart.fss.or.kr/",
+    "wait": 9000,
+    "w": 1440,
+    "h": 900,
+    "dsf": 2,
+    "path": "C:/AI_Agent/FactLens_AI/_shots/opendart_main.png"
+  },
+  {
+    "name": "dart_viewer",
+    "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260310002820",
+    "wait": 14000,
+    "w": 1440,
+    "h": 950,
+    "dsf": 2,
+    "path": "C:/AI_Agent/FactLens_AI/_shots/dart_viewer.png",
+    "steps": [
+      {
+        "js": "document.title",
+        "wait": 1000,
+        "log": true
+      }
+    ]
+  }
+]

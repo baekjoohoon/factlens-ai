@@ -1,0 +1,28 @@
+# --- secrets -------------------------------------------------
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# --- python --------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# --- local data / outputs -----------------------------------
+data/cache/
+data/factlens.db
+data/exports/
+tests/results/*.json
+!tests/results/.gitkeep
+
+# --- logs / os ----------------------------------------------
+*.log
+.DS_Store
+Thumbs.db
+
+# --- docs/images kept out of the public repo (size) -----------
+_shots/crops/

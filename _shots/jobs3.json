@@ -1,0 +1,18 @@
+[
+  {
+    "name": "dart_is",
+    "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260310002820",
+    "wait": 13000,
+    "w": 1440,
+    "h": 950,
+    "dsf": 2,
+    "path": "C:/AI_Agent/FactLens_AI/_shots/dart_is.png",
+    "steps": [
+      {
+        "js": "(()=>{const a=[...document.querySelectorAll('a')].find(x=>x.textContent.replace(/\\s/g,'').includes('연결손익계산서')); if(!a) return 'NO_LINK'; a.click(); return a.textContent.trim();})()",
+        "wait": 12000,
+        "log": true
+      }
+    ]
+  }
+]
