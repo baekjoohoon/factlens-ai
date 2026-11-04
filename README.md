@@ -5,9 +5,9 @@
 > reads the claim, but every number is recomputed in Python `Decimal` from the filing, and the
 > verdict is a pure function of those computed values. The model is never allowed to produce
 > a number or a verdict, so results are deterministic even though the LLM runs every time.
-> Built during the hackathon: `factlens/vision.py` (Muse vision), `MusePlanner` in
-> `factlens/llm.py` (Meta Model API), the UI/CLI wiring, and 11 new tests. The calc/verdict/
-> filing layers are a pre-existing codebase and are reused unchanged — see §1 for details.
+> **Built during the hackathon:** `factlens/vision.py` (Muse vision), `MusePlanner` in
+> `factlens/llm.py` (Meta Model API), the UI/CLI wiring, and 11 new tests. The calc / verdict /
+> filing layers are the author's own earlier work and are reused unchanged — see §1.
 > Repo: https://github.com/baekjoohoon/factlens-ai
 
 온라인에서 접한 투자 관련 주장을 **금융감독원 OpenDART 공시**와 대조하고,
@@ -42,10 +42,18 @@
 > **검증 상태**: OpenDART 실호출과 실제 Muse 호출은 2026-11-04~05에 완료했습니다.
 > 결과는 `tests/results/`에 원본 JSON으로 남아 있습니다.
 
-> **해커톤 중 새로 만든 부분**: `factlens/vision.py`(이미지 판독), `factlens/llm.py`의
-> `MusePlanner`(Meta Model API 연동·스키마 강제·추론토큰 대응), 위 둘을 잇는 UI/CLI 배선,
-> 그리고 `tests/test_vision.py`·시나리오 9~11(이미지 경로)입니다.
-> 기존 코드베이스(계산·판정·공시 조회)는 해커톤 이전에 작성한 것을 그대로 사용했습니다.
+### 해커톤 기간에 만든 것
+
+- `factlens/vision.py` — Muse 비전 입력으로 캡처에서 주장 문장 추출
+  (MIME 판별, 1600px 다운스케일, NONE 처리, 추론토큰 진단)
+- `factlens/llm.py`의 `MusePlanner` — Meta Model API 클라이언트, JSON 스키마 강제,
+  수치 가드, 토큰 집계, 키 마스킹된 오류
+- 이미지 탭 (UI) 과 `--image` (CLI) 배선
+- `tests/test_vision.py` 11건 · 시나리오 9~11 (이미지 경로)
+
+이 프로젝트의 기반이 된 **계산·판정·공시 조회 계층은 참가자 본인이 이전에 작성한
+자신의 코드**이며, 변경 없이 그대로 사용했습니다. 해커톤 기간에 새로 작성한 것은
+위 목록입니다.
 
 ---
 
